@@ -120,16 +120,16 @@ class GA:
     
     def optimize(self, run, result_dir, record_data=False, display=False) -> float:
         if display:
-            print(f"Generation {0: 4d}, eval num {(self.evaluation): 4d}, best fitness = {self.best_so_far.fitness:4.4f}")
+            print(f"Generation {0: 4d}, best fitness = {self.best_so_far.fitness:4.4f}")
         ### Evolve the population ###
-        for gen in range(self.generations):
+        for gen in range(self.generation):
             self.evolve()
             if display:
-                print(f"Generation {(gen+1): 4d}, eval num {(self.evaluation): 4d}, best fitness = {self.best_so_far.fitness:4.4f}")
+                print(f"Generation {(gen+1): 4d}, best fitness = {self.best_so_far.fitness:4.4f}")
         if record_data:
-            with open(result_dir + 'run_' + str(run) + '.pickle', 'wb') as f:
+            with open(result_dir + '/run_' + str(run) + '.pickle', 'wb') as f:
                 pickle.dump(self.historical_data, f)
-        return self.best_so_far.fitness, self.evaluation, self.best_so_far.fitness
+        return self.best_so_far.gene, self.best_so_far.fitness
 
 def sharpened_cosine_similarity(u, v, alpha=3):
     """
