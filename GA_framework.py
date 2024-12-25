@@ -1,47 +1,52 @@
 from chromosome import GAChromosome as Chromosome
+import numpy as np
 import random
-import time
 import pickle
 
-POP_SIZE = 100
-XOVER_RATE = 0.9
-GENERATION = 5000
-EVAL_TERMINATION = 30000
-
-class SGA:
-    def __init__(self, problem, task_dim, lower_bound, upper_bound):
-
+class GA:
+    def __init__(self, dim, lb, ub, target_vec, gen, pop_size, xover_rate, mutate_rate, k):
+        """
+        GA class for NLP Term Project (Prompt Recovery).
+        
+        Parameters:
+            dim (int): embedding vector length.
+            lb (float): embedding space lower bound value.
+            ub (float): embedding space upper bound value.
+            target_vec: target embedding vector.
+            gen (int): number of generation.
+            pop_size (int): population size.
+            xover_rate (float [0,1]): crossover rate.
+            mutate_rate (float [0,1]): mutation rate.
+            k (int): tournament size.
+        Target:
+            Obtain the embedding vector with the highest similarity to the given target embedding vector.
+        """
         #### Variable declaration ####
-        self.lb = lower_bound
-        self.ub = upper_bound
+        self.lb = lb
+        self.ub = ub
 
-        self.dim = task_dim #int
-        self.pop_size = POP_SIZE #int
-        self.xover_rate  = XOVER_RATE #float
-        self.mutate_rate = 1/task_dim #float
-        self.generations = GENERATION #int
-
-        self.problem = problem
+        self.dim = dim
+        self.pop_size = pop_size
+        self.xover_rate  = xover_rate
+        self.mutate_rate = mutate_rate
+        self.generation = gen
+        self.k = k
+        self.target_vec = target_vec
 
         self.pop = []
         self.best_so_far = None
         self.gen = 0
-        self.evaluation = 0
         self.historical_data = []
-
-        self.start_time = time.time()
 
         self.pop = [Chromosome(dim=self.dim, lb=self.lb, ub=self.ub) for i in range(self.pop_size)]
         self.best_so_far = self.pop[0]
 
         #### Evaluate the initial population ####
         for _, chrm in enumerate(self.pop):
-            # print(f"Evaluating {(i/len(offspring))*100: 3.1f}%", end="\r")
             chrm.fitness = self.evaluate(chrm.gene)
-            self.evaluation += 1
-            if chrm.fitness < self.best_so_far.fitness: # Minimization
+            if chrm.fitness > self.best_so_far.fitness:
                 self.best_so_far = chrm
-            info = {'BestFitness': self.best_so_far.fitness, 'Generation':self.gen, 'Time': time.time()-self.start_time}
+            info = {'BestFitness': self.best_so_far.fitness, 'Generation':self.gen}
             self.historical_data.append(info)
 
     def evolve(self):
@@ -52,8 +57,8 @@ class SGA:
         while len(offspring) < self.pop_size:
             
             #### Parent selection ####
-            p1 = self.parent_selection()
-            p2 = self.parent_selection()
+            p1 = self.parent_selection(self.k)
+            p2 = self.parent_selection(self.k)
             #### Global crossover ####
             c1, c2 = self.uniform_xover(p1,p2)
             
@@ -65,29 +70,24 @@ class SGA:
         
         #### Evaluate offspring ####
         for _, chrm in enumerate(offspring):
-            # print(f"Evaluating {(i/len(offspring))*100: 3.1f}%", end="\r")
             chrm.fitness = self.evaluate(chrm.gene)
-            self.evaluation += 1
-            if chrm.fitness < self.best_so_far.fitness: # Minimization
+            if chrm.fitness > self.best_so_far.fitness: 
                 self.best_so_far = chrm
-            info = {'BestFitness': self.best_so_far.fitness, 'Generation':self.gen, 'Time': time.time()-self.start_time}
+            info = {'BestFitness': self.best_so_far.fitness, 'Generation':self.gen}
             self.historical_data.append(info)
 
         #### Survival selection ####
         self.pop = self.survival_selection(offspring)
-    
-    def parent_selection(self):
-        # Calculate the sum of fitness values
-        total_fitness = sum(1/chrm.fitness for chrm in self.pop)
-        # Calculate the probability distribution
-        probabilities = [(1/chrm.fitness)/total_fitness for chrm in self.pop]
-        # Spin the roulette wheel to select one individual
-        selected_individual = random.choices(self.pop, probabilities)[0]
-        return selected_individual
+
+    def parent_selection(self, k) -> Chromosome:
+        candidates = []
+        for i in range(k): #k-tournament
+            candidates.append(self.pop[random.randint(0, (self.pop_size-1))])
+        sorted_candidates = sorted(candidates, key=lambda chrm:chrm.fitness, reverse=True)
+        return sorted_candidates[0]
     
     def uniform_xover(self, p1, p2):
         child1, child2 = Chromosome(self.dim,self.lb,self.ub), Chromosome(self.dim,self.lb,self.ub)
-        
         if random.random() <= self.xover_rate:
             for i in range(len(p1.gene)):
                 if random.random() <= 0.5:
@@ -109,14 +109,13 @@ class SGA:
         return chrm
 
     def evaluate(self, gene) -> float:
-        obj_value = self.problem.test(gene[:self.dim])
-        # obj_value = SCH_func(gene[:self.dim])
-        return obj_value
+        fitness = sharpened_cosine_similarity(gene, self.target_vec, 3)
+        return fitness
 
     def survival_selection(self, offspring_pool):
         # mu + lambda
         n_survivor = len(self.pop)
-        sorted_pool = sorted(offspring_pool, key=lambda chrm:chrm.fitness, reverse=False)
+        sorted_pool = sorted(offspring_pool, key=lambda chrm:chrm.fitness, reverse=True)
         return sorted_pool[:n_survivor]
     
     def optimize(self, run, result_dir, record_data=False, display=False) -> float:
@@ -127,9 +126,29 @@ class SGA:
             self.evolve()
             if display:
                 print(f"Generation {(gen+1): 4d}, eval num {(self.evaluation): 4d}, best fitness = {self.best_so_far.fitness:4.4f}")
-            if self.evaluation > EVAL_TERMINATION:
-                break
         if record_data:
             with open(result_dir + 'run_' + str(run) + '.pickle', 'wb') as f:
                 pickle.dump(self.historical_data, f)
         return self.best_so_far.fitness, self.evaluation, self.best_so_far.fitness
+
+def sharpened_cosine_similarity(u, v, alpha=3):
+    """
+    Compute the Sharpened Cosine Similarity between two vectors.
+    
+    Parameters:
+        u (np.ndarray): First vector.
+        v (np.ndarray): Second vector.
+        alpha (float): Sharpening parameter (default is 3).
+        
+    Returns:
+        float: Sharpened cosine similarity.
+    """
+    # Ensure the vectors are NumPy arrays
+    u = np.array(u)
+    v = np.array(v)
+    
+    # Compute the cosine similarity
+    cosine_sim = np.dot(u, v) / (np.linalg.norm(u) * np.linalg.norm(v))
+    
+    # Apply the sharpening exponent
+    return cosine_sim**alpha
