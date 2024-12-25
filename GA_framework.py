@@ -1,9 +1,7 @@
 from chromosome import GAChromosome as Chromosome
-from SCH import SCH_func
 import random
 import time
 import pickle
-import math
 
 POP_SIZE = 100
 XOVER_RATE = 0.9
