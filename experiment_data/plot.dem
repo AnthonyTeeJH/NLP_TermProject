@@ -1,0 +1,33 @@
+reset
+
+set terminal pngcairo enhanced font 'Arial,20' size 800,600
+#set output 'anytime_behavior_lucrarea.png'
+set output 'anytime_behavior_meanprompts.png'
+
+set datafile separator ','
+
+#set lmargin at screen 0.20
+#set rmargin at screen 0.9
+
+#set ylabel sprintf("Similarity {/:Normal=27 →}") 
+set ylabel "Sharpened Cosine Similarity (SCS)"
+set xlabel "Generation"
+set xrange [0:1000]
+set xtics 0, 100, 1000
+set yrange [0:1.0]
+set ytics 0, 0.2, 1.0
+
+set key right bottom
+last_y = 0.893768
+
+# Annotate the highest similarity at the right center
+set label sprintf("Highest SCS = %.2f", last_y) at graph 0.95, graph 0.5 right
+
+set style line 1 \
+    linecolor rgb 'blue' \
+    linetype 1 linewidth 2 \
+        pointtype 7
+
+# Plot the main graph
+#plot "anytime_behavior_lucrarea.csv" using 1:2 every 100 with linespoints linestyle 1 notitle
+plot "anytime_behavior_meanprompts.csv" using 1:2 every 100 with linespoints linestyle 1 notitle
