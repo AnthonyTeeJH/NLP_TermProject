@@ -19,7 +19,7 @@ class GA:
             mutate_rate (float [0,1]): mutation rate.
             k (int): tournament size.
         Target:
-            Obtain the embedding vector with the highest similarity to the given target embedding vector.
+            Obtain the embedding vector with the highest similarity to the given target embedding vector(s).
         """
         #### Variable declaration ####
         self.lb = lb
@@ -109,7 +109,13 @@ class GA:
         return chrm
 
     def evaluate(self, gene) -> float:
-        fitness = sharpened_cosine_similarity(gene, self.target_vec, 3)
+        if len(self.target_vec) > 1:
+            fitness_list = []
+            for prompt in self.target_vec:
+                fitness_list.append(sharpened_cosine_similarity(gene, self.target_vec[0], 3))
+            fitness = np.mean(fitness_list)
+        else:
+            fitness = sharpened_cosine_similarity(gene, self.target_vec[0], 3)
         return fitness
 
     def survival_selection(self, offspring_pool):
